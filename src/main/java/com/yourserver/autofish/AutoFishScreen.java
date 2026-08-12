@@ -17,6 +17,7 @@ public class AutoFishScreen extends Screen {
     private TextFieldWidget maxReactionField;
     private ButtonWidget randomizeReactionButton;
     private ButtonWidget pauseOnFullInvButton;
+    private TextFieldWidget sensitivityField;
 
     public AutoFishScreen(AutoFishConfig config) {
         super(Text.literal("AutoFish Settings"));
@@ -67,6 +68,12 @@ public class AutoFishScreen extends Screen {
         addDrawableChild(pauseOnFullInvButton);
         y += 30;
 
+        sensitivityField = new TextFieldWidget(this.textRenderer, centerX - 100, y, 90, 20, Text.literal(""));
+        sensitivityField.setText(String.valueOf(config.biteSensitivity));
+        sensitivityField.setTextPredicate(s -> s.isEmpty() || s.matches("\\d{0,3}(\\.\\d{0,4})?"));
+        addDrawableChild(sensitivityField);
+        y += 30;
+
         addDrawableChild(ButtonWidget.builder(Text.literal("Done"), btn -> close())
                 .dimensions(centerX - 100, y, 200, 20)
                 .build());
@@ -100,6 +107,7 @@ public class AutoFishScreen extends Screen {
         context.drawTextWithShadow(this.textRenderer, Text.literal("Recast delay (ms)"), centerX - 100, this.height / 2 - 90 + 32, 0xA0A0A0);
         context.drawTextWithShadow(this.textRenderer, Text.literal("min / max"), centerX + 5, this.height / 2 - 90 + 32, 0xA0A0A0);
         context.drawTextWithShadow(this.textRenderer, Text.literal("Reaction time (ms) min / max"), centerX - 100, this.height / 2 - 90 + 86, 0xA0A0A0);
+        context.drawTextWithShadow(this.textRenderer, Text.literal("Bite sensitivity (lower = more sensitive)"), centerX - 100, this.height / 2 - 90 + 140, 0xA0A0A0);
     }
 
     private void applyFields() {
@@ -107,12 +115,21 @@ public class AutoFishScreen extends Screen {
         config.maxDelayMs = parseOrKeep(maxDelayField.getText(), config.maxDelayMs);
         config.minReactionMs = parseOrKeep(minReactionField.getText(), config.minReactionMs);
         config.maxReactionMs = parseOrKeep(maxReactionField.getText(), config.maxReactionMs);
+        config.biteSensitivity = parseOrKeepDouble(sensitivityField.getText(), config.biteSensitivity);
         config.clampValues();
     }
 
     private int parseOrKeep(String text, int fallback) {
         try {
             return Integer.parseInt(text.trim());
+        } catch (NumberFormatException e) {
+            return fallback;
+        }
+    }
+
+    private double parseOrKeepDouble(String text, double fallback) {
+        try {
+            return Double.parseDouble(text.trim());
         } catch (NumberFormatException e) {
             return fallback;
         }
@@ -126,6 +143,6 @@ public class AutoFishScreen extends Screen {
 
     @Override
     public boolean shouldPause() {
-        return false; // don't freeze singleplayer world time while adjusting settings
+        return false;
     }
 }
