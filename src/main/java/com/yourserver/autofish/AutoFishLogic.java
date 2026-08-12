@@ -23,18 +23,20 @@ public final class AutoFishLogic {
 
     private double lastBobberY = Double.NaN;
 
-    // How many ticks to keep waiting for the bobber entity to actually
-    // appear after casting, before giving up and treating it as a failed
-    // cast. The server needs a round trip to spawn and send the bobber
-    // back to the client - checking too early makes it look like the
-    // cast "failed" every single time, causing a rapid cast/reel spam.
     private static final int BOBBER_SPAWN_GRACE_TICKS = 40; // 2 seconds
     private int graceTicksRemaining = 0;
 
-    // Safety net: give up on a cast if no bite after this long, in case
-    // the bobber landed somewhere unusual (dry land, blocked by fences, etc).
     private static final int MAX_WAIT_TICKS = 1200; // 60 seconds
     private int waitTicks = 0;
+
+    // The bobber jerks downward when it first lands in water too (going
+    // from falling to floating) - identical to the signal we watch for a
+    // real bite. So we wait for it to sit calm/near-zero velocity for a
+    // stretch of ticks first, and only start watching for bites after that.
+    private static final double SETTLE_VELOCITY_EPSILON = 0.03;
+    private static final int REQUIRED_SETTLED_TICKS = 10; // 0.5s of calm floating
+    private boolean settled = false;
+    private int settledTicks = 0;
 
     public AutoFishLogic(AutoFishConfig config) {
         this.config = config;
@@ -70,6 +72,8 @@ public final class AutoFishLogic {
                 lastBobberY = Double.NaN;
                 graceTicksRemaining = BOBBER_SPAWN_GRACE_TICKS;
                 waitTicks = 0;
+                settled = false;
+                settledTicks = 0;
             }
             case WAITING_FOR_BITE -> checkForBite(client);
             case REACTING -> {
@@ -126,6 +130,20 @@ public final class AutoFishLogic {
         }
 
         double y = bobber.getVelocity().y;
+
+        if (!settled) {
+            if (Math.abs(y) < SETTLE_VELOCITY_EPSILON) {
+                settledTicks++;
+                if (settledTicks >= REQUIRED_SETTLED_TICKS) {
+                    settled = true;
+                }
+            } else {
+                settledTicks = 0;
+            }
+            lastBobberY = y;
+            return;
+        }
+
         if (!Double.isNaN(lastBobberY)) {
             double drop = lastBobberY - y;
             if (drop > 0.25 && y < -0.05) {
