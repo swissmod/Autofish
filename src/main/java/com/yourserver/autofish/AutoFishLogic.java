@@ -9,19 +9,10 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.util.Hand;
 import net.minecraft.util.math.random.Random;
 
-/**
- * Drives the actual cast -> wait for bite -> reel -> random delay -> recast loop.
- * Runs on the client tick event, so it only ever acts like a very fast, very
- * consistent player clicking their own mouse - it doesn't touch the network
- * protocol or send anything a real right-click wouldn't send.
- */
 public final class AutoFishLogic {
 
     private enum State {
-        IDLE,               // rod not out, waiting to cast
-        WAITING_FOR_BITE,   // rod is out, watching the bobber
-        REACTING,           // bite detected, waiting a short randomized reaction time
-        WAITING_TO_RECAST   // just reeled in, waiting a randomized delay before casting again
+        IDLE, WAITING_FOR_BITE, REACTING, WAITING_TO_RECAST
     }
 
     private final AutoFishConfig config;
@@ -31,6 +22,19 @@ public final class AutoFishLogic {
     private int tickTimer = 0;
 
     private double lastBobberY = Double.NaN;
+
+    // How many ticks to keep waiting for the bobber entity to actually
+    // appear after casting, before giving up and treating it as a failed
+    // cast. The server needs a round trip to spawn and send the bobber
+    // back to the client - checking too early makes it look like the
+    // cast "failed" every single time, causing a rapid cast/reel spam.
+    private static final int BOBBER_SPAWN_GRACE_TICKS = 40; // 2 seconds
+    private int graceTicksRemaining = 0;
+
+    // Safety net: give up on a cast if no bite after this long, in case
+    // the bobber landed somewhere unusual (dry land, blocked by fences, etc).
+    private static final int MAX_WAIT_TICKS = 1200; // 60 seconds
+    private int waitTicks = 0;
 
     public AutoFishLogic(AutoFishConfig config) {
         this.config = config;
@@ -49,7 +53,6 @@ public final class AutoFishLogic {
             return;
         }
         if (client.currentScreen != null) {
-            // Don't do anything while any GUI (including ours) is open.
             return;
         }
         if (!isHoldingFishingRod(client)) {
@@ -57,7 +60,7 @@ public final class AutoFishLogic {
             return;
         }
         if (config.pauseOnFullInventory && client.player.getInventory().getEmptySlot() == -1) {
-            return; // inventory full, pause quietly instead of spamming casts
+            return;
         }
 
         switch (state) {
@@ -65,6 +68,8 @@ public final class AutoFishLogic {
                 castLine(client);
                 state = State.WAITING_FOR_BITE;
                 lastBobberY = Double.NaN;
+                graceTicksRemaining = BOBBER_SPAWN_GRACE_TICKS;
+                waitTicks = 0;
             }
             case WAITING_FOR_BITE -> checkForBite(client);
             case REACTING -> {
@@ -103,16 +108,19 @@ public final class AutoFishLogic {
         client.player.swingHand(hand);
     }
 
-    /**
-     * Looks for the player's fishing bobber entity and watches its vertical
-     * velocity for the sharp downward jerk that happens when a fish bites.
-     * This mirrors the same visual cue a human player watches for - it does
-     * not read any hidden/server-only information.
-     */
     private void checkForBite(MinecraftClient client) {
         FishingBobberEntity bobber = findOwnBobber(client);
         if (bobber == null) {
-            // Bobber is gone (line broke, got reeled by something else, etc).
+            if (graceTicksRemaining > 0) {
+                graceTicksRemaining--;
+                return;
+            }
+            state = State.IDLE;
+            return;
+        }
+        graceTicksRemaining = 0;
+
+        if (++waitTicks > MAX_WAIT_TICKS) {
             state = State.IDLE;
             return;
         }
@@ -120,8 +128,6 @@ public final class AutoFishLogic {
         double y = bobber.getVelocity().y;
         if (!Double.isNaN(lastBobberY)) {
             double drop = lastBobberY - y;
-            // Threshold tuned against vanilla bite behavior; adjust if your
-            // server has custom fishing mechanics.
             if (drop > 0.25 && y < -0.05) {
                 int reactionMs = config.randomizeReactionTime
                         ? randomBetween(config.minReactionMs, config.maxReactionMs)
@@ -148,10 +154,6 @@ public final class AutoFishLogic {
     }
 
     private int millisToTicks(int millis) {
-        // Minecraft runs at a fixed 20 ticks/sec -> 50ms per tick.
-        // We still add randomness at the millisecond level (per your request)
-        // and just round to the nearest tick, since the tick loop is the
-        // finest resolution client logic actually runs at.
         return Math.max(0, Math.round(millis / 50.0f));
     }
 }
