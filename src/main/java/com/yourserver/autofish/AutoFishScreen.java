@@ -67,7 +67,7 @@ public class AutoFishScreen extends Screen {
         addDrawableChild(pauseOnFullInvButton);
         y += 30;
 
-        addDrawableChild(ButtonWidget.builder(Text.literal("Done"), btn -> onClose())
+        addDrawableChild(ButtonWidget.builder(Text.literal("Done"), btn -> close())
                 .dimensions(centerX - 100, y, 200, 20)
                 .build());
     }
