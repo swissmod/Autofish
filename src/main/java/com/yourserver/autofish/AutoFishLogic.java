@@ -33,7 +33,6 @@ public final class AutoFishLogic {
     private static final int REQUIRED_SETTLED_TICKS = 10; // 0.5s of calm floating
     private boolean settled = false;
     private int settledTicks = 0;
-    private double peakDropSinceSettled = 0;
 
     public AutoFishLogic(AutoFishConfig config) {
         this.config = config;
@@ -71,7 +70,6 @@ public final class AutoFishLogic {
                 waitTicks = 0;
                 settled = false;
                 settledTicks = 0;
-                peakDropSinceSettled = 0;
             }
             case WAITING_FOR_BITE -> checkForBite(client);
             case REACTING -> {
@@ -144,18 +142,7 @@ public final class AutoFishLogic {
 
         if (!Double.isNaN(lastBobberY)) {
             double drop = lastBobberY - y;
-
-            if (drop > peakDropSinceSettled) {
-                peakDropSinceSettled = drop;
-            }
-            client.player.sendMessage(
-                    net.minecraft.text.Text.literal(String.format(
-                            "AutoFish debug: vY=%.4f  drop=%.4f  peakDrop=%.4f",
-                            y, drop, peakDropSinceSettled)),
-                    true
-            );
-
-            if (drop > 0.25 && y < -0.05) {
+            if (drop > config.biteSensitivity) {
                 int reactionMs = config.randomizeReactionTime
                         ? randomBetween(config.minReactionMs, config.maxReactionMs)
                         : 0;
