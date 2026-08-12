@@ -1,31 +1,29 @@
 package com.yourserver.autofish;
 
-/**
- * Holds all user-adjustable settings for AutoFish.
- * Kept as simple public fields since this is a tiny, single-purpose config.
- */
 public class AutoFishConfig {
 
     public boolean enabled = false;
 
-    // Random delay window (in milliseconds) before re-casting after a catch.
     public int minDelayMs = 100;
     public int maxDelayMs = 200;
 
-    // Extra: randomized "reaction time" before reeling in after a bite is
-    // detected, so every player doesn't reel in on the exact same tick.
     public boolean randomizeReactionTime = true;
     public int minReactionMs = 50;
     public int maxReactionMs = 300;
 
-    // Extra: pause autofishing automatically if your inventory fills up
-    // with junk items, so you don't idle forever with a full inventory.
     public boolean pauseOnFullInventory = true;
+
+    // How big a sudden downward jerk in the bobber's velocity counts as a
+    // bite. Lower = more sensitive (catches subtler bites, but more prone
+    // to false triggers). Real observed bite values were roughly 0.06-0.16,
+    // so the default sits comfortably below that whole range.
+    public double biteSensitivity = 0.04;
 
     public void clampValues() {
         minDelayMs = Math.max(0, minDelayMs);
         maxDelayMs = Math.max(minDelayMs, maxDelayMs);
         minReactionMs = Math.max(0, minReactionMs);
         maxReactionMs = Math.max(minReactionMs, maxReactionMs);
+        if (biteSensitivity < 0.001) biteSensitivity = 0.001;
     }
 }
