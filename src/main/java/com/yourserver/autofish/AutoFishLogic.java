@@ -29,14 +29,11 @@ public final class AutoFishLogic {
     private static final int MAX_WAIT_TICKS = 1200; // 60 seconds
     private int waitTicks = 0;
 
-    // The bobber jerks downward when it first lands in water too (going
-    // from falling to floating) - identical to the signal we watch for a
-    // real bite. So we wait for it to sit calm/near-zero velocity for a
-    // stretch of ticks first, and only start watching for bites after that.
     private static final double SETTLE_VELOCITY_EPSILON = 0.03;
     private static final int REQUIRED_SETTLED_TICKS = 10; // 0.5s of calm floating
     private boolean settled = false;
     private int settledTicks = 0;
+    private double peakDropSinceSettled = 0;
 
     public AutoFishLogic(AutoFishConfig config) {
         this.config = config;
@@ -74,6 +71,7 @@ public final class AutoFishLogic {
                 waitTicks = 0;
                 settled = false;
                 settledTicks = 0;
+                peakDropSinceSettled = 0;
             }
             case WAITING_FOR_BITE -> checkForBite(client);
             case REACTING -> {
@@ -146,6 +144,17 @@ public final class AutoFishLogic {
 
         if (!Double.isNaN(lastBobberY)) {
             double drop = lastBobberY - y;
+
+            if (drop > peakDropSinceSettled) {
+                peakDropSinceSettled = drop;
+            }
+            client.player.sendMessage(
+                    net.minecraft.text.Text.literal(String.format(
+                            "AutoFish debug: vY=%.4f  drop=%.4f  peakDrop=%.4f",
+                            y, drop, peakDropSinceSettled)),
+                    true
+            );
+
             if (drop > 0.25 && y < -0.05) {
                 int reactionMs = config.randomizeReactionTime
                         ? randomBetween(config.minReactionMs, config.maxReactionMs)
