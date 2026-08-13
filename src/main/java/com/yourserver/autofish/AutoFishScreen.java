@@ -18,6 +18,7 @@ public class AutoFishScreen extends Screen {
     private ButtonWidget randomizeReactionButton;
     private ButtonWidget pauseOnFullInvButton;
     private TextFieldWidget sensitivityField;
+    private TextFieldWidget teleportDistanceField;
 
     public AutoFishScreen(AutoFishConfig config) {
         super(Text.literal("AutoFish Settings"));
@@ -74,6 +75,12 @@ public class AutoFishScreen extends Screen {
         addDrawableChild(sensitivityField);
         y += 30;
 
+        teleportDistanceField = new TextFieldWidget(this.textRenderer, centerX - 100, y, 90, 20, Text.literal(""));
+        teleportDistanceField.setText(String.valueOf(config.teleportResetDistance));
+        teleportDistanceField.setTextPredicate(s -> s.isEmpty() || s.matches("\\d{0,4}(\\.\\d{0,2})?"));
+        addDrawableChild(teleportDistanceField);
+        y += 30;
+
         addDrawableChild(ButtonWidget.builder(Text.literal("Done"), btn -> close())
                 .dimensions(centerX - 100, y, 200, 20)
                 .build());
@@ -108,6 +115,7 @@ public class AutoFishScreen extends Screen {
         context.drawTextWithShadow(this.textRenderer, Text.literal("min / max"), centerX + 5, this.height / 2 - 90 + 32, 0xA0A0A0);
         context.drawTextWithShadow(this.textRenderer, Text.literal("Reaction time (ms) min / max"), centerX - 100, this.height / 2 - 90 + 86, 0xA0A0A0);
         context.drawTextWithShadow(this.textRenderer, Text.literal("Bite sensitivity (lower = more sensitive)"), centerX - 100, this.height / 2 - 90 + 140, 0xA0A0A0);
+        context.drawTextWithShadow(this.textRenderer, Text.literal("Teleport reset distance (blocks)"), centerX - 100, this.height / 2 - 90 + 194, 0xA0A0A0);
     }
 
     private void applyFields() {
@@ -116,6 +124,7 @@ public class AutoFishScreen extends Screen {
         config.minReactionMs = parseOrKeep(minReactionField.getText(), config.minReactionMs);
         config.maxReactionMs = parseOrKeep(maxReactionField.getText(), config.maxReactionMs);
         config.biteSensitivity = parseOrKeepDouble(sensitivityField.getText(), config.biteSensitivity);
+        config.teleportResetDistance = parseOrKeepDouble(teleportDistanceField.getText(), config.teleportResetDistance);
         config.clampValues();
     }
 
