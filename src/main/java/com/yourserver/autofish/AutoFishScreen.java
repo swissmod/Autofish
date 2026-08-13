@@ -19,6 +19,7 @@ public class AutoFishScreen extends Screen {
     private ButtonWidget pauseOnFullInvButton;
     private TextFieldWidget sensitivityField;
     private TextFieldWidget teleportDistanceField;
+    private ButtonWidget antiAfkButton;
 
     public AutoFishScreen(AutoFishConfig config) {
         super(Text.literal("AutoFish Settings"));
@@ -81,6 +82,15 @@ public class AutoFishScreen extends Screen {
         addDrawableChild(teleportDistanceField);
         y += 30;
 
+        antiAfkButton = ButtonWidget.builder(antiAfkLabel(), btn -> {
+                    config.antiAfkEnabled = !config.antiAfkEnabled;
+                    btn.setMessage(antiAfkLabel());
+                })
+                .dimensions(centerX - 100, y, 200, 20)
+                .build();
+        addDrawableChild(antiAfkButton);
+        y += 30;
+
         addDrawableChild(ButtonWidget.builder(Text.literal("Done"), btn -> close())
                 .dimensions(centerX - 100, y, 200, 20)
                 .build());
@@ -103,6 +113,10 @@ public class AutoFishScreen extends Screen {
 
     private Text pauseLabel() {
         return Text.literal("Pause When Inventory Full: " + (config.pauseOnFullInventory ? "ON" : "OFF"));
+    }
+
+    private Text antiAfkLabel() {
+        return Text.literal("Anti-AFK Movements: " + (config.antiAfkEnabled ? "ON" : "OFF"));
     }
 
     @Override
