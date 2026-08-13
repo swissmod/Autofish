@@ -14,6 +14,7 @@ public class AutoFishConfig {
     public boolean pauseOnFullInventory = true;
 
     public double biteSensitivity = 0.04;
+    public boolean antiAfkEnabled = true;
 
     // Safety net for server-side teleport bugs: if you move further than
     // this many blocks from where autofishing started, it sends /hub and
