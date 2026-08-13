@@ -13,11 +13,12 @@ public class AutoFishConfig {
 
     public boolean pauseOnFullInventory = true;
 
-    // How big a sudden downward jerk in the bobber's velocity counts as a
-    // bite. Lower = more sensitive (catches subtler bites, but more prone
-    // to false triggers). Real observed bite values were roughly 0.06-0.16,
-    // so the default sits comfortably below that whole range.
     public double biteSensitivity = 0.04;
+
+    // Safety net for server-side teleport bugs: if you move further than
+    // this many blocks from where autofishing started, it sends /hub and
+    // turns itself off, instead of continuing to fish from a random spot.
+    public double teleportResetDistance = 25.0;
 
     public void clampValues() {
         minDelayMs = Math.max(0, minDelayMs);
@@ -25,5 +26,6 @@ public class AutoFishConfig {
         minReactionMs = Math.max(0, minReactionMs);
         maxReactionMs = Math.max(minReactionMs, maxReactionMs);
         if (biteSensitivity < 0.001) biteSensitivity = 0.001;
+        if (teleportResetDistance < 1.0) teleportResetDistance = 1.0;
     }
 }
