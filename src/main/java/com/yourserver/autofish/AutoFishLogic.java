@@ -34,6 +34,17 @@ public final class AutoFishLogic {
     private boolean settled = false;
     private int settledTicks = 0;
 
+    // Remembers where the player was when autofishing started, so we can
+    // detect an unexpected teleport (server bug) and bail out safely.
+    private boolean hasAnchor = false;
+    private double anchorX, anchorY, anchorZ;
+
+    // After a teleport is detected, autofishing turns off immediately but
+    // we wait this many ticks before actually sending /hub, giving the
+    // server a moment to settle first.
+    private static final int HUB_DELAY_TICKS = 60; // 3 seconds
+    private int pendingHubTicks = 0;
+
     public AutoFishLogic(AutoFishConfig config) {
         this.config = config;
     }
@@ -43,8 +54,17 @@ public final class AutoFishLogic {
     }
 
     private void onTick(MinecraftClient client) {
+        if (pendingHubTicks > 0) {
+            pendingHubTicks--;
+            if (pendingHubTicks == 0 && client.player != null && client.player.networkHandler != null) {
+                client.player.networkHandler.sendChatCommand("hub");
+            }
+            return;
+        }
+
         if (!config.enabled) {
             state = State.IDLE;
+            hasAnchor = false;
             return;
         }
         if (client.player == null || client.world == null || client.interactionManager == null) {
@@ -53,6 +73,29 @@ public final class AutoFishLogic {
         if (client.currentScreen != null) {
             return;
         }
+
+        if (!hasAnchor) {
+            anchorX = client.player.getX();
+            anchorY = client.player.getY();
+            anchorZ = client.player.getZ();
+            hasAnchor = true;
+        } else {
+            double dx = client.player.getX() - anchorX;
+            double dy = client.player.getY() - anchorY;
+            double dz = client.player.getZ() - anchorZ;
+            double distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
+            if (distance > config.teleportResetDistance) {
+                // Unexpected teleport (server bug) - turn autofishing off
+                // right away, then wait a few seconds before sending /hub
+                // so the server has time to settle first.
+                config.enabled = false;
+                state = State.IDLE;
+                hasAnchor = false;
+                pendingHubTicks = HUB_DELAY_TICKS;
+                return;
+            }
+        }
+
         if (!isHoldingFishingRod(client)) {
             state = State.IDLE;
             return;
