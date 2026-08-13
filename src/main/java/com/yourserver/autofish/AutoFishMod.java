@@ -26,6 +26,7 @@ public class AutoFishMod implements ClientModInitializer {
         ));
 
         new AutoFishLogic(config).register();
+        new AntiAfkLogic(config).register();
 
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             while (openMenuKey.wasPressed()) {
