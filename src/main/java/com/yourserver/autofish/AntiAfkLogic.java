@@ -15,14 +15,16 @@ public final class AntiAfkLogic {
     private int actionTicksRemaining = 0;
     private ActionType currentAction = null;
 
-    private static final int SNEAK_DURATION_TICKS = 12; // 0.6s
+    private static final int SNEAK_DURATION_TICKS = 60; // 3 seconds
+    private static final int JUMP_DURATION_TICKS = 40;  // 2 seconds, holds the key so it bunny-hops
 
     private float lookStartYaw;
     private float lookStartPitch;
     private float lookTargetYawOffset;
-    private static final int LOOK_TURN_TICKS = 8;
-    private static final int LOOK_HOLD_TICKS = 6;
-    private static final int LOOK_RETURN_TICKS = 8;
+    private float lookTargetPitchOffset;
+    private static final int LOOK_TURN_TICKS = 10;
+    private static final int LOOK_HOLD_TICKS = 8;
+    private static final int LOOK_RETURN_TICKS = 10;
     private int lookPhaseTicksRemaining;
     private int lookPhase;
 
@@ -49,7 +51,7 @@ public final class AntiAfkLogic {
         }
         if (!config.enabled || !config.antiAfkEnabled || client.currentScreen != null) {
             if (currentAction == ActionType.SNEAK) {
-                client.player.setSneaking(false);
+                client.options.sneakKey.setPressed(false);
             }
             if (currentAction == ActionType.JUMP) {
                 client.options.jumpKey.setPressed(false);
@@ -74,17 +76,18 @@ public final class AntiAfkLogic {
 
         switch (currentAction) {
             case SNEAK -> {
-                client.player.setSneaking(true);
+                client.options.sneakKey.setPressed(true);
                 actionTicksRemaining = SNEAK_DURATION_TICKS;
             }
             case JUMP -> {
                 client.options.jumpKey.setPressed(true);
-                actionTicksRemaining = 2;
+                actionTicksRemaining = JUMP_DURATION_TICKS;
             }
             case LOOK -> {
                 lookStartYaw = client.player.getYaw();
                 lookStartPitch = client.player.getPitch();
-                lookTargetYawOffset = (random.nextBoolean() ? 1 : -1) * (15f + random.nextInt(20));
+                lookTargetYawOffset = (random.nextBoolean() ? 1 : -1) * (12f + random.nextInt(26));
+                lookTargetPitchOffset = (random.nextBoolean() ? 1 : -1) * random.nextInt(6);
                 lookPhase = 0;
                 lookPhaseTicksRemaining = LOOK_TURN_TICKS;
             }
@@ -95,7 +98,7 @@ public final class AntiAfkLogic {
         switch (currentAction) {
             case SNEAK -> {
                 if (--actionTicksRemaining <= 0) {
-                    client.player.setSneaking(false);
+                    client.options.sneakKey.setPressed(false);
                     finishAction();
                 }
             }
@@ -109,13 +112,20 @@ public final class AntiAfkLogic {
         }
     }
 
+    private float ease(float t) {
+        return t * t * (3f - 2f * t);
+    }
+
     private void runLookAction(MinecraftClient client) {
         lookPhaseTicksRemaining--;
-        float progress;
+        float rawProgress;
+        float eased;
         switch (lookPhase) {
             case 0 -> {
-                progress = 1f - (lookPhaseTicksRemaining / (float) LOOK_TURN_TICKS);
-                client.player.setYaw(lookStartYaw + lookTargetYawOffset * progress);
+                rawProgress = 1f - (lookPhaseTicksRemaining / (float) LOOK_TURN_TICKS);
+                eased = ease(rawProgress);
+                client.player.setYaw(lookStartYaw + lookTargetYawOffset * eased);
+                client.player.setPitch(lookStartPitch + lookTargetPitchOffset * eased);
                 if (lookPhaseTicksRemaining <= 0) {
                     lookPhase = 1;
                     lookPhaseTicksRemaining = LOOK_HOLD_TICKS;
@@ -128,8 +138,10 @@ public final class AntiAfkLogic {
                 }
             }
             case 2 -> {
-                progress = 1f - (lookPhaseTicksRemaining / (float) LOOK_RETURN_TICKS);
-                client.player.setYaw(lookStartYaw + lookTargetYawOffset * (1f - progress));
+                rawProgress = 1f - (lookPhaseTicksRemaining / (float) LOOK_RETURN_TICKS);
+                eased = ease(rawProgress);
+                client.player.setYaw(lookStartYaw + lookTargetYawOffset * (1f - eased));
+                client.player.setPitch(lookStartPitch + lookTargetPitchOffset * (1f - eased));
                 if (lookPhaseTicksRemaining <= 0) {
                     client.player.setYaw(lookStartYaw);
                     client.player.setPitch(lookStartPitch);
