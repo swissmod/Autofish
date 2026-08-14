@@ -28,7 +28,7 @@ public final class AutoFishLogic {
 
     // Safety net: give up on a cast if no bite after this long, in case
     // the bobber landed somewhere unusual (dry land, blocked by fences, etc).
-    private static final int MAX_WAIT_TICKS = 400; // 20 seconds
+    private static final int MAX_WAIT_TICKS = 500; // 20 seconds
     private int waitTicks = 0;
 
     private static final double SETTLE_VELOCITY_EPSILON = 0.03;
