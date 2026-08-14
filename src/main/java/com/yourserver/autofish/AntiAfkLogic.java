@@ -16,7 +16,12 @@ public final class AntiAfkLogic {
     private ActionType currentAction = null;
 
     private static final int SNEAK_DURATION_TICKS = 60; // 3 seconds
+
     private static final int JUMP_DURATION_TICKS = 40;  // 2 seconds, holds the key so it bunny-hops
+    private static final int JUMP_SNEAK_START_TICK = 10;
+    private static final int JUMP_SNEAK_DURATION_TICKS = 20; // 1 second
+    private int jumpElapsedTicks;
+    private boolean jumpSneakActive;
 
     private float lookStartYaw;
     private float lookStartPitch;
@@ -50,12 +55,8 @@ public final class AntiAfkLogic {
             return;
         }
         if (!config.enabled || !config.antiAfkEnabled || client.currentScreen != null) {
-            if (currentAction == ActionType.SNEAK) {
-                client.options.sneakKey.setPressed(false);
-            }
-            if (currentAction == ActionType.JUMP) {
-                client.options.jumpKey.setPressed(false);
-            }
+            client.options.sneakKey.setPressed(false);
+            client.options.jumpKey.setPressed(false);
             currentAction = null;
             return;
         }
@@ -82,6 +83,8 @@ public final class AntiAfkLogic {
             case JUMP -> {
                 client.options.jumpKey.setPressed(true);
                 actionTicksRemaining = JUMP_DURATION_TICKS;
+                jumpElapsedTicks = 0;
+                jumpSneakActive = false;
             }
             case LOOK -> {
                 lookStartYaw = client.player.getYaw();
@@ -102,13 +105,31 @@ public final class AntiAfkLogic {
                     finishAction();
                 }
             }
-            case JUMP -> {
-                if (--actionTicksRemaining <= 0) {
-                    client.options.jumpKey.setPressed(false);
-                    finishAction();
-                }
-            }
+            case JUMP -> runJumpAction(client);
             case LOOK -> runLookAction(client);
+        }
+    }
+
+    private void runJumpAction(MinecraftClient client) {
+        jumpElapsedTicks++;
+
+        boolean shouldSneakNow = jumpElapsedTicks >= JUMP_SNEAK_START_TICK
+                && jumpElapsedTicks < JUMP_SNEAK_START_TICK + JUMP_SNEAK_DURATION_TICKS;
+        if (shouldSneakNow && !jumpSneakActive) {
+            client.options.sneakKey.setPressed(true);
+            jumpSneakActive = true;
+        } else if (!shouldSneakNow && jumpSneakActive) {
+            client.options.sneakKey.setPressed(false);
+            jumpSneakActive = false;
+        }
+
+        if (--actionTicksRemaining <= 0) {
+            client.options.jumpKey.setPressed(false);
+            if (jumpSneakActive) {
+                client.options.sneakKey.setPressed(false);
+                jumpSneakActive = false;
+            }
+            finishAction();
         }
     }
 
