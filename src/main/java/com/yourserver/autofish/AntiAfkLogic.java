@@ -27,9 +27,10 @@ public final class AntiAfkLogic {
     private float lookStartPitch;
     private float lookTargetYawOffset;
     private float lookTargetPitchOffset;
-    private static final int LOOK_TURN_TICKS = 10;
-    private static final int LOOK_HOLD_TICKS = 8;
-    private static final int LOOK_RETURN_TICKS = 14;
+    private float lookOvershootStrength;
+    private int lookTurnTicks;
+    private int lookHoldTicks;
+    private int lookReturnTicks;
     private int lookPhaseTicksRemaining;
     private int lookPhase;
 
@@ -89,10 +90,20 @@ public final class AntiAfkLogic {
             case LOOK -> {
                 lookStartYaw = client.player.getYaw();
                 lookStartPitch = client.player.getPitch();
-                lookTargetYawOffset = (random.nextBoolean() ? 1 : -1) * (12f + random.nextInt(26));
-                lookTargetPitchOffset = (random.nextBoolean() ? 1 : -1) * (4f + random.nextInt(9));
+
+                lookTargetYawOffset = (random.nextBoolean() ? 1 : -1) * (8f + random.nextInt(34));
+                lookTargetPitchOffset = (random.nextBoolean() ? 1 : -1) * (2f + random.nextInt(11));
+
+                lookTurnTicks = 7 + random.nextInt(7);
+                lookHoldTicks = 4 + random.nextInt(10);
+                lookReturnTicks = 10 + random.nextInt(12);
+
+                lookOvershootStrength = random.nextInt(5) == 0
+                        ? 0f
+                        : 0.6f + random.nextFloat() * 2.0f;
+
                 lookPhase = 0;
-                lookPhaseTicksRemaining = LOOK_TURN_TICKS;
+                lookPhaseTicksRemaining = lookTurnTicks;
             }
         }
     }
@@ -137,8 +148,7 @@ public final class AntiAfkLogic {
         return t * t * (3f - 2f * t);
     }
 
-    private float easeOutBack(float t) {
-        float c1 = 1.70158f;
+    private float easeOutBack(float t, float c1) {
         float c3 = c1 + 1f;
         float x = t - 1f;
         return 1f + c3 * x * x * x + c1 * x * x;
@@ -149,24 +159,24 @@ public final class AntiAfkLogic {
         float rawProgress;
         switch (lookPhase) {
             case 0 -> {
-                rawProgress = 1f - (lookPhaseTicksRemaining / (float) LOOK_TURN_TICKS);
+                rawProgress = 1f - (lookPhaseTicksRemaining / (float) lookTurnTicks);
                 float eased = ease(rawProgress);
                 client.player.setYaw(lookStartYaw + lookTargetYawOffset * eased);
                 client.player.setPitch(lookStartPitch + lookTargetPitchOffset * eased);
                 if (lookPhaseTicksRemaining <= 0) {
                     lookPhase = 1;
-                    lookPhaseTicksRemaining = LOOK_HOLD_TICKS;
+                    lookPhaseTicksRemaining = lookHoldTicks;
                 }
             }
             case 1 -> {
                 if (lookPhaseTicksRemaining <= 0) {
                     lookPhase = 2;
-                    lookPhaseTicksRemaining = LOOK_RETURN_TICKS;
+                    lookPhaseTicksRemaining = lookReturnTicks;
                 }
             }
             case 2 -> {
-                rawProgress = 1f - (lookPhaseTicksRemaining / (float) LOOK_RETURN_TICKS);
-                float eased = easeOutBack(rawProgress);
+                rawProgress = 1f - (lookPhaseTicksRemaining / (float) lookReturnTicks);
+                float eased = easeOutBack(rawProgress, lookOvershootStrength);
                 client.player.setYaw(lookStartYaw + lookTargetYawOffset * (1f - eased));
                 client.player.setPitch(lookStartPitch + lookTargetPitchOffset * (1f - eased));
                 if (lookPhaseTicksRemaining <= 0) {
