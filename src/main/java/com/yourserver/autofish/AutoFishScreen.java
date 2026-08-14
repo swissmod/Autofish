@@ -20,6 +20,7 @@ public class AutoFishScreen extends Screen {
     private TextFieldWidget sensitivityField;
     private TextFieldWidget teleportDistanceField;
     private ButtonWidget antiAfkButton;
+    private ButtonWidget playerDetectionButton;
 
     public AutoFishScreen(AutoFishConfig config) {
         super(Text.literal("AutoFish Settings"));
@@ -91,6 +92,15 @@ public class AutoFishScreen extends Screen {
         addDrawableChild(antiAfkButton);
         y += 30;
 
+        playerDetectionButton = ButtonWidget.builder(playerDetectionLabel(), btn -> {
+                    config.playerDetectionEnabled = !config.playerDetectionEnabled;
+                    btn.setMessage(playerDetectionLabel());
+                })
+                .dimensions(centerX - 100, y, 200, 20)
+                .build();
+        addDrawableChild(playerDetectionButton);
+        y += 30;
+
         addDrawableChild(ButtonWidget.builder(Text.literal("Done"), btn -> close())
                 .dimensions(centerX - 100, y, 200, 20)
                 .build());
@@ -117,6 +127,10 @@ public class AutoFishScreen extends Screen {
 
     private Text antiAfkLabel() {
         return Text.literal("Anti-AFK Movements: " + (config.antiAfkEnabled ? "ON" : "OFF"));
+    }
+
+    private Text playerDetectionLabel() {
+        return Text.literal("Pause If Player Nearby: " + (config.playerDetectionEnabled ? "ON" : "OFF"));
     }
 
     @Override
