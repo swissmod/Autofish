@@ -26,7 +26,9 @@ public final class AutoFishLogic {
     private static final int BOBBER_SPAWN_GRACE_TICKS = 40; // 2 seconds
     private int graceTicksRemaining = 0;
 
-    private static final int MAX_WAIT_TICKS = 1200; // 60 seconds
+    // Safety net: give up on a cast if no bite after this long, in case
+    // the bobber landed somewhere unusual (dry land, blocked by fences, etc).
+    private static final int MAX_WAIT_TICKS = 400; // 20 seconds
     private int waitTicks = 0;
 
     private static final double SETTLE_VELOCITY_EPSILON = 0.03;
@@ -34,14 +36,12 @@ public final class AutoFishLogic {
     private boolean settled = false;
     private int settledTicks = 0;
 
-    // Remembers where the player was when autofishing started, so we can
-    // detect an unexpected teleport (server bug) and bail out safely.
+    private static final double RECENT_MAX_DECAY_PER_TICK = 0.01;
+    private double recentMaxY = Double.NaN;
+
     private boolean hasAnchor = false;
     private double anchorX, anchorY, anchorZ;
 
-    // After a teleport is detected, autofishing turns off immediately but
-    // we wait this many ticks before actually sending /hub, giving the
-    // server a moment to settle first.
     private static final int HUB_DELAY_TICKS = 60; // 3 seconds
     private int pendingHubTicks = 0;
 
@@ -85,9 +85,6 @@ public final class AutoFishLogic {
             double dz = client.player.getZ() - anchorZ;
             double distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
             if (distance > config.teleportResetDistance) {
-                // Unexpected teleport (server bug) - turn autofishing off
-                // right away, then wait a few seconds before sending /hub
-                // so the server has time to settle first.
                 config.enabled = false;
                 state = State.IDLE;
                 hasAnchor = false;
@@ -113,6 +110,7 @@ public final class AutoFishLogic {
                 waitTicks = 0;
                 settled = false;
                 settledTicks = 0;
+                recentMaxY = Double.NaN;
             }
             case WAITING_FOR_BITE -> checkForBite(client);
             case REACTING -> {
@@ -184,7 +182,13 @@ public final class AutoFishLogic {
         }
 
         if (!Double.isNaN(lastBobberY)) {
-            double drop = lastBobberY - y;
+            if (Double.isNaN(recentMaxY)) {
+                recentMaxY = y;
+            } else {
+                recentMaxY = Math.max(y, recentMaxY - RECENT_MAX_DECAY_PER_TICK);
+            }
+
+            double drop = recentMaxY - y;
             if (drop > config.biteSensitivity) {
                 int reactionMs = config.randomizeReactionTime
                         ? randomBetween(config.minReactionMs, config.maxReactionMs)
