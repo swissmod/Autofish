@@ -29,7 +29,7 @@ public final class AntiAfkLogic {
     private float lookTargetPitchOffset;
     private static final int LOOK_TURN_TICKS = 10;
     private static final int LOOK_HOLD_TICKS = 8;
-    private static final int LOOK_RETURN_TICKS = 10;
+    private static final int LOOK_RETURN_TICKS = 14;
     private int lookPhaseTicksRemaining;
     private int lookPhase;
 
@@ -90,7 +90,7 @@ public final class AntiAfkLogic {
                 lookStartYaw = client.player.getYaw();
                 lookStartPitch = client.player.getPitch();
                 lookTargetYawOffset = (random.nextBoolean() ? 1 : -1) * (12f + random.nextInt(26));
-                lookTargetPitchOffset = (random.nextBoolean() ? 1 : -1) * random.nextInt(6);
+                lookTargetPitchOffset = (random.nextBoolean() ? 1 : -1) * (4f + random.nextInt(9));
                 lookPhase = 0;
                 lookPhaseTicksRemaining = LOOK_TURN_TICKS;
             }
@@ -137,14 +137,20 @@ public final class AntiAfkLogic {
         return t * t * (3f - 2f * t);
     }
 
+    private float easeOutBack(float t) {
+        float c1 = 1.70158f;
+        float c3 = c1 + 1f;
+        float x = t - 1f;
+        return 1f + c3 * x * x * x + c1 * x * x;
+    }
+
     private void runLookAction(MinecraftClient client) {
         lookPhaseTicksRemaining--;
         float rawProgress;
-        float eased;
         switch (lookPhase) {
             case 0 -> {
                 rawProgress = 1f - (lookPhaseTicksRemaining / (float) LOOK_TURN_TICKS);
-                eased = ease(rawProgress);
+                float eased = ease(rawProgress);
                 client.player.setYaw(lookStartYaw + lookTargetYawOffset * eased);
                 client.player.setPitch(lookStartPitch + lookTargetPitchOffset * eased);
                 if (lookPhaseTicksRemaining <= 0) {
@@ -160,7 +166,7 @@ public final class AntiAfkLogic {
             }
             case 2 -> {
                 rawProgress = 1f - (lookPhaseTicksRemaining / (float) LOOK_RETURN_TICKS);
-                eased = ease(rawProgress);
+                float eased = easeOutBack(rawProgress);
                 client.player.setYaw(lookStartYaw + lookTargetYawOffset * (1f - eased));
                 client.player.setPitch(lookStartPitch + lookTargetPitchOffset * (1f - eased));
                 if (lookPhaseTicksRemaining <= 0) {
