@@ -17,7 +17,7 @@ public final class AntiAfkLogic {
 
     private static final int SNEAK_DURATION_TICKS = 60; // 3 seconds
 
-    private static final int JUMP_DURATION_TICKS = 40;  // 2 seconds, holds the key so it bunny-hops
+    private static final int JUMP_DURATION_TICKS = 40;
     private static final int JUMP_SNEAK_START_TICK = 10;
     private static final int JUMP_SNEAK_DURATION_TICKS = 20; // 1 second
     private int jumpElapsedTicks;
@@ -34,11 +34,14 @@ public final class AntiAfkLogic {
     private int lookPhaseTicksRemaining;
     private int lookPhase;
 
-    private double strafeAnchorX;
-    private double strafeAnchorZ;
+    private int strafeRandomTicksRemaining;
     private int strafeCycleTicksRemaining;
     private int strafeMicroStepTicks;
     private boolean strafeGoingRight;
+    private int strafeNetBias;
+    private boolean strafeCorrecting;
+    private int strafeCorrectionTicksRemaining;
+    private static final int STRAFE_CORRECTION_CAP_TICKS = 40; // safety cap, 2 seconds
 
     private static final int MIN_INTERVAL_MS = 5000;
     private static final int MAX_INTERVAL_MS = 10000;
@@ -62,11 +65,13 @@ public final class AntiAfkLogic {
             return;
         }
         if (!config.enabled || !config.antiAfkEnabled || client.currentScreen != null) {
-            client.options.sneakKey.setPressed(false);
-            client.options.jumpKey.setPressed(false);
-            client.options.leftKey.setPressed(false);
-            client.options.rightKey.setPressed(false);
-            currentAction = null;
+            if (currentAction != null) {
+                client.options.sneakKey.setPressed(false);
+                client.options.jumpKey.setPressed(false);
+                client.options.leftKey.setPressed(false);
+                client.options.rightKey.setPressed(false);
+                currentAction = null;
+            }
             return;
         }
 
@@ -106,20 +111,20 @@ public final class AntiAfkLogic {
                 lookHoldTicks = 4 + random.nextInt(10);
                 lookReturnTicks = 10 + random.nextInt(12);
 
-                lookOvershootStrength = random.nextInt(5) == 0
+                lookOvershootStrength = random.nextInt(6) == 0
                         ? 0f
-                        : 0.6f + random.nextFloat() * 2.0f;
+                        : 1.0f + random.nextFloat() * 3.0f;
 
                 lookPhase = 0;
                 lookPhaseTicksRemaining = lookTurnTicks;
             }
             case STRAFE -> {
-                strafeAnchorX = client.player.getX();
-                strafeAnchorZ = client.player.getZ();
-                actionTicksRemaining = 10 + random.nextInt(21); // 0.5-1.5 seconds
+                strafeRandomTicksRemaining = 10 + random.nextInt(21);
                 strafeGoingRight = random.nextBoolean();
                 strafeMicroStepTicks = 2 + random.nextInt(3);
                 strafeCycleTicksRemaining = strafeMicroStepTicks;
+                strafeNetBias = 0;
+                strafeCorrecting = false;
                 setStrafeKey(client, strafeGoingRight, true);
             }
         }
@@ -171,21 +176,46 @@ public final class AntiAfkLogic {
     }
 
     private void runStrafeAction(MinecraftClient client) {
-        if (--strafeCycleTicksRemaining <= 0) {
-            setStrafeKey(client, strafeGoingRight, false);
-            strafeGoingRight = !strafeGoingRight;
-            strafeMicroStepTicks = 2 + random.nextInt(3);
-            strafeCycleTicksRemaining = strafeMicroStepTicks;
-            setStrafeKey(client, strafeGoingRight, true);
+        if (!strafeCorrecting) {
+            strafeNetBias += strafeGoingRight ? 1 : -1;
+
+            if (--strafeCycleTicksRemaining <= 0) {
+                setStrafeKey(client, strafeGoingRight, false);
+                strafeGoingRight = !strafeGoingRight;
+                strafeMicroStepTicks = 2 + random.nextInt(3);
+                strafeCycleTicksRemaining = strafeMicroStepTicks;
+                setStrafeKey(client, strafeGoingRight, true);
+            }
+
+            if (--strafeRandomTicksRemaining <= 0) {
+                setStrafeKey(client, strafeGoingRight, false);
+                client.options.leftKey.setPressed(false);
+                client.options.rightKey.setPressed(false);
+
+                if (strafeNetBias == 0) {
+                    finishStrafe(client);
+                    return;
+                }
+                boolean correctToRight = strafeNetBias < 0;
+                strafeCorrectionTicksRemaining = Math.min(Math.abs(strafeNetBias), STRAFE_CORRECTION_CAP_TICKS);
+                strafeCorrecting = true;
+                setStrafeKey(client, correctToRight, true);
+                strafeGoingRight = correctToRight;
+            }
+            return;
         }
 
-        if (--actionTicksRemaining <= 0) {
-            client.options.leftKey.setPressed(false);
-            client.options.rightKey.setPressed(false);
-            client.player.setVelocity(0.0, client.player.getVelocity().y, 0.0);
-            client.player.setPosition(strafeAnchorX, client.player.getY(), strafeAnchorZ);
-            finishAction();
+        if (--strafeCorrectionTicksRemaining <= 0) {
+            setStrafeKey(client, strafeGoingRight, false);
+            finishStrafe(client);
         }
+    }
+
+    private void finishStrafe(MinecraftClient client) {
+        client.options.leftKey.setPressed(false);
+        client.options.rightKey.setPressed(false);
+        client.player.setVelocity(0.0, client.player.getVelocity().y, 0.0);
+        finishAction();
     }
 
     private float ease(float t) {
