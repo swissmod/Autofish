@@ -179,6 +179,11 @@ public final class AntiAfkLogic {
         }
     }
 
+    private void releaseStrafeKeyAndStop(MinecraftClient client, boolean right) {
+        setStrafeKey(client, right, false);
+        client.player.setVelocity(0.0, client.player.getVelocity().y, 0.0);
+    }
+
     private double distanceToAnchor(MinecraftClient client) {
         double dx = client.player.getX() - strafeAnchorX;
         double dz = client.player.getZ() - strafeAnchorZ;
@@ -188,7 +193,7 @@ public final class AntiAfkLogic {
     private void runStrafeAction(MinecraftClient client) {
         if (!strafeCorrecting) {
             if (--strafeCycleTicksRemaining <= 0) {
-                setStrafeKey(client, strafeGoingRight, false);
+                releaseStrafeKeyAndStop(client, strafeGoingRight);
                 strafeGoingRight = !strafeGoingRight;
                 strafeMicroStepTicks = 2 + random.nextInt(3);
                 strafeCycleTicksRemaining = strafeMicroStepTicks;
@@ -196,7 +201,7 @@ public final class AntiAfkLogic {
             }
 
             if (--strafeRandomTicksRemaining <= 0) {
-                setStrafeKey(client, strafeGoingRight, false);
+                releaseStrafeKeyAndStop(client, strafeGoingRight);
                 client.options.leftKey.setPressed(false);
                 client.options.rightKey.setPressed(false);
 
@@ -220,13 +225,13 @@ public final class AntiAfkLogic {
         double dist = distanceToAnchor(client);
 
         if (dist <= STRAFE_RETURN_TOLERANCE) {
-            setStrafeKey(client, strafeGoingRight, false);
+            releaseStrafeKeyAndStop(client, strafeGoingRight);
             finishStrafe(client);
             return;
         }
 
         if (dist > strafeLastDistance + 0.002) {
-            setStrafeKey(client, strafeGoingRight, false);
+            releaseStrafeKeyAndStop(client, strafeGoingRight);
             strafeGoingRight = !strafeGoingRight;
             strafeMicroStepTicks = 2 + random.nextInt(3);
             strafeCycleTicksRemaining = strafeMicroStepTicks;
@@ -235,14 +240,14 @@ public final class AntiAfkLogic {
         strafeLastDistance = dist;
 
         if (--strafeCycleTicksRemaining <= 0) {
-            setStrafeKey(client, strafeGoingRight, false);
+            releaseStrafeKeyAndStop(client, strafeGoingRight);
             strafeMicroStepTicks = 2 + random.nextInt(3);
             strafeCycleTicksRemaining = strafeMicroStepTicks;
             setStrafeKey(client, strafeGoingRight, true);
         }
 
         if (strafeCorrectionTicksElapsed >= STRAFE_CORRECTION_CAP_TICKS) {
-            setStrafeKey(client, strafeGoingRight, false);
+            releaseStrafeKeyAndStop(client, strafeGoingRight);
             finishStrafe(client);
         }
     }
