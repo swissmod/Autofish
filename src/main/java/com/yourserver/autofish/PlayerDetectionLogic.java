@@ -9,7 +9,7 @@ import net.minecraft.util.math.Vec3d;
 
 public final class PlayerDetectionLogic {
 
-    private enum DetectState { NONE, WAITING_TO_DISABLE, DISABLED_WAITING_FOR_CLEAR, WAITING_TO_RESUME }
+    private enum DetectState { NONE, WAITING_TO_DISABLE, DISABLED_WAITING_FOR_CLEAR, WAITING_TO_RESUME, RESUMING_LOOK }
 
     private final AutoFishConfig config;
 
@@ -21,10 +21,12 @@ public final class PlayerDetectionLogic {
     private static final int WAIT_BEFORE_DISABLE_TICKS = 60;
     private static final int RESUME_DELAY_TICKS = 100;
 
+    private float originalYaw, originalPitch;
+
     private boolean lookActive = false;
     private int lookTicksElapsed;
     private static final int LOOK_TOTAL_TICKS = 15;
-    private float lookStartYaw, lookStartPitch, lookTargetYaw, lookTargetPitch;
+    private float lookAnimStartYaw, lookAnimStartPitch, lookAnimTargetYaw, lookAnimTargetPitch;
 
     public PlayerDetectionLogic(AutoFishConfig config) {
         this.config = config;
@@ -83,6 +85,12 @@ public final class PlayerDetectionLogic {
                     return;
                 }
                 if (--timer <= 0) {
+                    startLookBack(client);
+                    detectState = DetectState.RESUMING_LOOK;
+                }
+            }
+            case RESUMING_LOOK -> {
+                if (!lookActive) {
                     config.enabled = true;
                     detectState = DetectState.NONE;
                 }
@@ -111,14 +119,26 @@ public final class PlayerDetectionLogic {
     }
 
     private void startLookAt(MinecraftClient client, PlayerEntity target) {
-        lookStartYaw = client.player.getYaw();
-        lookStartPitch = client.player.getPitch();
+        originalYaw = client.player.getYaw();
+        originalPitch = client.player.getPitch();
 
         Vec3d delta = target.getEyePos().subtract(client.player.getEyePos());
         double horizontalDist = Math.sqrt(delta.x * delta.x + delta.z * delta.z);
-        lookTargetYaw = (float) (MathHelper.wrapDegrees(Math.toDegrees(Math.atan2(delta.z, delta.x)) - 90.0));
-        lookTargetPitch = (float) (-Math.toDegrees(Math.atan2(delta.y, horizontalDist)));
+        float targetYaw = (float) (MathHelper.wrapDegrees(Math.toDegrees(Math.atan2(delta.z, delta.x)) - 90.0));
+        float targetPitch = (float) (-Math.toDegrees(Math.atan2(delta.y, horizontalDist)));
 
+        beginLookAnimation(client.player.getYaw(), client.player.getPitch(), targetYaw, targetPitch);
+    }
+
+    private void startLookBack(MinecraftClient client) {
+        beginLookAnimation(client.player.getYaw(), client.player.getPitch(), originalYaw, originalPitch);
+    }
+
+    private void beginLookAnimation(float startYaw, float startPitch, float targetYaw, float targetPitch) {
+        lookAnimStartYaw = startYaw;
+        lookAnimStartPitch = startPitch;
+        lookAnimTargetYaw = targetYaw;
+        lookAnimTargetPitch = targetPitch;
         lookTicksElapsed = 0;
         lookActive = true;
     }
@@ -130,8 +150,8 @@ public final class PlayerDetectionLogic {
     private void runLookAnimation(MinecraftClient client) {
         lookTicksElapsed++;
         float progress = ease(lookTicksElapsed / (float) LOOK_TOTAL_TICKS);
-        client.player.setYaw(lerpAngle(lookStartYaw, lookTargetYaw, progress));
-        client.player.setPitch(lookStartPitch + (lookTargetPitch - lookStartPitch) * progress);
+        client.player.setYaw(lerpAngle(lookAnimStartYaw, lookAnimTargetYaw, progress));
+        client.player.setPitch(lookAnimStartPitch + (lookAnimTargetPitch - lookAnimStartPitch) * progress);
         if (lookTicksElapsed >= LOOK_TOTAL_TICKS) {
             lookActive = false;
         }
