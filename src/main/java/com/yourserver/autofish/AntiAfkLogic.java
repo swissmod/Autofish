@@ -15,11 +15,11 @@ public final class AntiAfkLogic {
     private int actionTicksRemaining = 0;
     private ActionType currentAction = null;
 
-    private static final int SNEAK_DURATION_TICKS = 60; // 3 seconds
+    private static final int SNEAK_DURATION_TICKS = 60;
 
     private static final int JUMP_DURATION_TICKS = 40;
     private static final int JUMP_SNEAK_START_TICK = 10;
-    private static final int JUMP_SNEAK_DURATION_TICKS = 20; // 1 second
+    private static final int JUMP_SNEAK_DURATION_TICKS = 20;
     private int jumpElapsedTicks;
     private boolean jumpSneakActive;
 
@@ -44,7 +44,7 @@ public final class AntiAfkLogic {
     private double strafeLastDistance;
     private int strafeCorrectionTicksElapsed;
     private static final double STRAFE_RETURN_TOLERANCE = 0.02;
-    private static final int STRAFE_CORRECTION_CAP_TICKS = 60;
+    private static final int STRAFE_CORRECTION_CAP_TICKS = 100;
 
     private static final int MIN_INTERVAL_MS = 5000;
     private static final int MAX_INTERVAL_MS = 10000;
@@ -209,6 +209,8 @@ public final class AntiAfkLogic {
                 strafeLastDistance = dist;
                 strafeCorrectionTicksElapsed = 0;
                 strafeCorrecting = true;
+                strafeMicroStepTicks = 2 + random.nextInt(3);
+                strafeCycleTicksRemaining = strafeMicroStepTicks;
                 setStrafeKey(client, strafeGoingRight, true);
             }
             return;
@@ -226,9 +228,18 @@ public final class AntiAfkLogic {
         if (dist > strafeLastDistance + 0.002) {
             setStrafeKey(client, strafeGoingRight, false);
             strafeGoingRight = !strafeGoingRight;
+            strafeMicroStepTicks = 2 + random.nextInt(3);
+            strafeCycleTicksRemaining = strafeMicroStepTicks;
             setStrafeKey(client, strafeGoingRight, true);
         }
         strafeLastDistance = dist;
+
+        if (--strafeCycleTicksRemaining <= 0) {
+            setStrafeKey(client, strafeGoingRight, false);
+            strafeMicroStepTicks = 2 + random.nextInt(3);
+            strafeCycleTicksRemaining = strafeMicroStepTicks;
+            setStrafeKey(client, strafeGoingRight, true);
+        }
 
         if (strafeCorrectionTicksElapsed >= STRAFE_CORRECTION_CAP_TICKS) {
             setStrafeKey(client, strafeGoingRight, false);
