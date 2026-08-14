@@ -6,7 +6,7 @@ import net.minecraft.util.math.random.Random;
 
 public final class AntiAfkLogic {
 
-    private enum ActionType { SNEAK, JUMP, LOOK }
+    private enum ActionType { SNEAK, JUMP, LOOK, STRAFE }
 
     private final AutoFishConfig config;
     private final Random random = Random.create();
@@ -34,6 +34,12 @@ public final class AntiAfkLogic {
     private int lookPhaseTicksRemaining;
     private int lookPhase;
 
+    private double strafeAnchorX;
+    private double strafeAnchorZ;
+    private int strafeCycleTicksRemaining;
+    private int strafeMicroStepTicks;
+    private boolean strafeGoingRight;
+
     private static final int MIN_INTERVAL_MS = 5000;
     private static final int MAX_INTERVAL_MS = 10000;
 
@@ -58,6 +64,8 @@ public final class AntiAfkLogic {
         if (!config.enabled || !config.antiAfkEnabled || client.currentScreen != null) {
             client.options.sneakKey.setPressed(false);
             client.options.jumpKey.setPressed(false);
+            client.options.leftKey.setPressed(false);
+            client.options.rightKey.setPressed(false);
             currentAction = null;
             return;
         }
@@ -105,6 +113,15 @@ public final class AntiAfkLogic {
                 lookPhase = 0;
                 lookPhaseTicksRemaining = lookTurnTicks;
             }
+            case STRAFE -> {
+                strafeAnchorX = client.player.getX();
+                strafeAnchorZ = client.player.getZ();
+                actionTicksRemaining = 10 + random.nextInt(21); // 0.5-1.5 seconds
+                strafeGoingRight = random.nextBoolean();
+                strafeMicroStepTicks = 2 + random.nextInt(3);
+                strafeCycleTicksRemaining = strafeMicroStepTicks;
+                setStrafeKey(client, strafeGoingRight, true);
+            }
         }
     }
 
@@ -118,6 +135,7 @@ public final class AntiAfkLogic {
             }
             case JUMP -> runJumpAction(client);
             case LOOK -> runLookAction(client);
+            case STRAFE -> runStrafeAction(client);
         }
     }
 
@@ -140,6 +158,32 @@ public final class AntiAfkLogic {
                 client.options.sneakKey.setPressed(false);
                 jumpSneakActive = false;
             }
+            finishAction();
+        }
+    }
+
+    private void setStrafeKey(MinecraftClient client, boolean right, boolean pressed) {
+        if (right) {
+            client.options.rightKey.setPressed(pressed);
+        } else {
+            client.options.leftKey.setPressed(pressed);
+        }
+    }
+
+    private void runStrafeAction(MinecraftClient client) {
+        if (--strafeCycleTicksRemaining <= 0) {
+            setStrafeKey(client, strafeGoingRight, false);
+            strafeGoingRight = !strafeGoingRight;
+            strafeMicroStepTicks = 2 + random.nextInt(3);
+            strafeCycleTicksRemaining = strafeMicroStepTicks;
+            setStrafeKey(client, strafeGoingRight, true);
+        }
+
+        if (--actionTicksRemaining <= 0) {
+            client.options.leftKey.setPressed(false);
+            client.options.rightKey.setPressed(false);
+            client.player.setVelocity(0.0, client.player.getVelocity().y, 0.0);
+            client.player.setPosition(strafeAnchorX, client.player.getY(), strafeAnchorZ);
             finishAction();
         }
     }
