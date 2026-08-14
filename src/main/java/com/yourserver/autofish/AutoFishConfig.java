@@ -15,6 +15,7 @@ public class AutoFishConfig {
 
     public double biteSensitivity = 0.04;
     public boolean antiAfkEnabled = true;
+    public boolean playerDetectionEnabled = true;
 
     // Safety net for server-side teleport bugs: if you move further than
     // this many blocks from where autofishing started, it sends /hub and
